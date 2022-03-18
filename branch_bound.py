@@ -1,5 +1,7 @@
 from graph import Base_Graph, Node
 from typing import List, Tuple
+from queue import LifoQueue as stack
+
 class Branch_and_Bound_Graph(Base_Graph):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -8,18 +10,39 @@ class Branch_and_Bound_Graph(Base_Graph):
         """
         Return the exact solution using branch and bound method
         """
-        
-        # initialize the upper and lower bounds
-        upper_bound = 0
-        lower_bound = float('inf')
+        # Initialization
+        s = stack()
+        s.put([origin])
+        best_path = []
+        best_cost = float('inf')
 
-        # initialize the path
-        path = [origin]
-        cost = 0
+        # Branch and bound
+        while s.qsize():
+            current_path = s.get()
+           
+            # Cut bad branches
+            if self.get_path_length(current_path) + len(self.nodes) - len(current_path) < best_cost: 
+           
+                # If the current path is a solution
+                if len(current_path) == len(self.nodes) + 1:
+                    best_path = current_path
+                    best_cost = self.get_path_length(current_path)
 
-        # get a successor to explore
-        successor = self.get_successors(origin)[0]
-        return 0
+                # If the current path is not a solution
+                elif len(current_path) < len(self.nodes):
+
+                    # For each unvisited node in the graph
+                    for node in self.nodes:
+                        if node not in current_path:
+                            # Create a new path to explore
+                            s.put(current_path + [node])
+                else:
+                    s.put(current_path + [origin])
+        return best_path, self.get_path_length(best_path)
+            
+
+
+
 
 g = Branch_and_Bound_Graph(
     nodes = [Node(label) for label in ['A', 'B', 'C', 'D']],
