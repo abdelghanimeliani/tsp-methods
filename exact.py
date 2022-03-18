@@ -24,18 +24,3 @@ class Exact_TSP_Graph(Base_Graph):
                 cost = weight
                 path += list(permutation) + [origin]
         return path, cost
-
-
-g = Exact_TSP_Graph(
-    nodes = [Node(label) for label in ['A', 'B', 'C', 'D']],
-    edges = {
-        ('A', 'B'): 1,
-        ('A', 'C'): 2,
-        ('A', 'D'): 3,
-        ('B', 'C'): 4,
-        ('B', 'D'): 5,
-        ('C', 'D'): 6
-    }
-)
-
-print(g.exact_solution('A'))
