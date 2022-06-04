@@ -131,7 +131,8 @@ class Solver:
 
         # Return the best path
         return path, instance.trace_tours([path])[0]
-
+        #! Important: Not yet implemented
+        # TODO: Implement GA
     def _genetic_algorithm_solve(
         self, 
         instance:StandardProblem, 
