@@ -1,31 +1,49 @@
+
+from ast import While
 from typing import Callable
 from tsplib95.models import StandardProblem
 from queue import LifoQueue as stack
-from numpy.random import random, shuffle, randint
+from numpy.random import random, shuffle, randint, sample
 from numpy import exp
+import logging
+from tsplib95 import load
+logging.basicConfig(level=logging.DEBUG)
+from numpy import array
+from time import perf_counter
+
+
 
 class Solver:
     def __init__(self, method: str="branch_and_bound") -> None:
         self.method = method
     @classmethod
     def neighbor_Δ_cost(cls, instance:StandardProblem, path:list, neighbor_path:list, nodes_to_swap:list) -> float:
-        return instance.get_weight(neighbor_path[nodes_to_swap[0]], neighbor_path[nodes_to_swap[0]] - 1)\
-                + instance.get_weight(neighbor_path[nodes_to_swap[0]], neighbor_path[nodes_to_swap[0]] + 1)\
-                + instance.get_weight(neighbor_path[nodes_to_swap[1]], neighbor_path[nodes_to_swap[1]] - 1)\
-                + instance.get_weight(neighbor_path[nodes_to_swap[1]], neighbor_path[nodes_to_swap[1]] + 1)\
-                - instance.get_weight(path[nodes_to_swap[0]], path[nodes_to_swap[0]] - 1)\
-                - instance.get_weight(path[nodes_to_swap[0]], path[nodes_to_swap[0]] + 1)\
-                - instance.get_weight(path[nodes_to_swap[1]], path[nodes_to_swap[1]] - 1)\
-                - instance.get_weight(path[nodes_to_swap[1]], path[nodes_to_swap[1]] + 1)
-        
+        mod = len(path)
+        return instance.get_weight(neighbor_path[nodes_to_swap[0]], neighbor_path[(nodes_to_swap[0] - 1) % mod])\
+                + instance.get_weight(neighbor_path[nodes_to_swap[0]], neighbor_path[(nodes_to_swap[0] + 1) % mod])\
+                + instance.get_weight(neighbor_path[nodes_to_swap[1]], neighbor_path[(nodes_to_swap[1] - 1) % mod])\
+                + instance.get_weight(neighbor_path[nodes_to_swap[1]], neighbor_path[(nodes_to_swap[1] + 1) % mod])\
+                - instance.get_weight(path[nodes_to_swap[0]], path[(nodes_to_swap[0] - 1) % mod])\
+                - instance.get_weight(path[nodes_to_swap[0]], path[(nodes_to_swap[0] + 1) % mod])\
+                - instance.get_weight(path[nodes_to_swap[1]], path[(nodes_to_swap[1] - 1) % mod])\
+                - instance.get_weight(path[nodes_to_swap[1]], path[(nodes_to_swap[1] + 1) % mod])        
 
-    def _branch_and_bound_solve(self, instance:StandardProblem, heuristic:Callable) ->StandardProblem:
+
+    def _get_adjacency_matrix(self, instance:StandardProblem) -> array:
+        nodes = list(instance.get_nodes())
+        return array(
+            [
+                [instance.get_weight(i, j) for j in instance.get_nodes()] for i in instance.get_nodes()
+            ]
+        )
+
+    def _branch_and_bound_solve(self, instance:StandardProblem):
         """
         Return the exact solution using branch and bound method
         """
-
         # Initialization
-        s = stack().put([0])
+        s = stack()
+        s.put([1])
         best_path = []
         best_cost = float('inf')
 
@@ -34,15 +52,15 @@ class Solver:
             current_path = s.get()
            
             # Cut bad branches
-            if heuristic(current_path) < best_cost: 
+            if instance.trace_tours([current_path]) + instance.dimension - len(current_path) < best_cost: 
            
                 # If the current path is a solution
-                if len(current_path) == len(self.nodes) + 1:
+                if len(current_path) == instance.dimension:
                     best_path = current_path
-                    best_cost = instance.trace_tours(current_path)
+                    best_cost = instance.trace_tours([current_path])
 
-                # If the current path is neither a solution nor an almost solution (i.e. one node from a solution)
-                elif len(current_path) < len(self.nodes):
+                # If the current path is not a solution
+                elif len(current_path) < instance.dimension - 1:
 
                     # For each unvisited node in the graph
                     for node in instance.get_nodes():
@@ -50,15 +68,32 @@ class Solver:
                             # Create a new path to explore
                             s.put(current_path + [node])
                 else:
-                    s.put(current_path + [0])
-        
+                    s.put(current_path)
+        return best_path, self.trace_tours([best_path])
+
+    def _nearest_neighbor_solve(self, instance:StandardProblem):
+        unvisited = [node for node in instance.get_nodes() if node != 1]
+        print("unvisited")
+        visited = [1]
+        while unvisited:
+            last = visited[-1]
+            neighbors = [instance.get_nodes()].sort(key=lambda x: instance.get_weight(last, x), reverse=True)
+            for neighbor in neighbors:
+                if neighbor not in visited:
+                    break
+            else:
+                raise ValueError('No unvisited neighbors')
+            visited.append(neighbor)
+            unvisited.remove(neighbor)
+        return visited, instance.trace_tours([visited])
+
     def _simulated_annealing_solve(
         self, 
         instance:StandardProblem, 
         initial_temperature:float=100, 
         final_temperature:float=1,
         cooling_rate:float=.5
-    ) ->StandardProblem:
+    ):
         """
         Returns an approximate solution using simulated annealing method
         :param tsplib95.models.StandardProblem instance: tsp instance to solve
@@ -71,8 +106,9 @@ class Solver:
 
         # initialization
         temperature = initial_temperature
-        path = shuffle(list(instance.get_nodes()))
-        cost = instance.trace_tours(path)
+        path = list(instance.get_nodes())
+        shuffle(path)
+        cost = instance.trace_tours([path])
 
         # Simulated annealing
         while temperature > final_temperature:
@@ -87,31 +123,68 @@ class Solver:
             # Accept or reject neighbor path
             if Δ_cost < 0 or exp(-Δ_cost / temperature) > random():
                 path = neighbor_path
-                cost = instance.trace_tours(path)
+                cost = instance.trace_tours([path])
+                # logging.debug(f"New cost: {cost}")
 
             # Cooling
             temperature *= cooling_rate
 
         # Return the best path
-        return StandardProblem(
-            name=f"{instance.name} Simulated Annealing Solution",
-            comment=f"Simulated Annealing Solution to {instance.name}",
-            dimension=instance.dimension,
-            type="TOUR",
-            dimension=instance.dimension,
-            tour_section=path,
-        ) 
+        return path, instance.trace_tours([path])[0]
+
+    def _genetic_algorithm_solve(
+        self, 
+        instance:StandardProblem, 
+        population_size:int=100, 
+        mutation_rate:float=.1, 
+        max_iterations:int=100
+    ):
+        
+        # initialize
+        population = [sample(list(instance.get_nodes()), len(instance.get_nodes())) for _ in population_size]
+
+    def _2_opt_solve(self, instance: StandardProblem, initial_tour:list):
+
+        # define local utils
+        def swap(tour, first_index, other_index):
+            tour[first_index:other_index] = tour[other_index - 1: first_index - 1: -1]
+            return tour
+        best = initial_tour
+        should_exit = False
+        while not should_exit:
+            should_exit = True
+            # chose two edges to swap
+            for first_index in range(1, instance.dimension - 2):
+                for other_index in range(first_index + 1, instance.dimension):
+                    if other_index - first_index == 1: continue # if nodes are adjacent do nothing
+                    if instance.get_weight(first_index, first_index + 1) + instance.get_weight(other_index, other_index + 1) >\
+                       instance.get_weight(first_index, other_index) + instance.get_weight(first_index + 1, other_index + 1):
+                       swapped = swap(best, first_index, other_index)
+                       should_exit = False
+            best = swapped
+        return best, instance.trace_tours([best])[0]
 
 
 
-    def solve(self, instance:StandardProblem, method:str="simulated_annealing", *args, **kwargs) ->StandardProblem:
+    def solve(self, instance:StandardProblem, method:str="simulated_annealing", benchmark:bool=False, *args, **kwargs):
         
         if method == "branch_and_bound":
-            return self._branch_and_bound_solve(instance, lambda path: instance.trace_tours(path), *args, **kwargs)
+            path, cost = self._branch_and_bound_solve(instance, *args, **kwargs)
+        elif method == "nearest_neighbor":
+            path, cost = self._nearest_neighbor_solve(instance)
+        elif method == "2-opt":
+            path, cost = self._2_opt_solve(instance, self._nearest_neighbor_solve(instance)[0])
         elif method == "simulated_annealing":
-            return self._simulated_annealing_solve(instance, *args, **kwargs)
+            path, cost = self._simulated_annealing_solve(instance, *args, **kwargs)
+        elif method == "genetic_algorithm":
+            path, cost = self._genetic_algorithm_solve(instance, *args, **kwargs)
         else:
-            raise ValueError("Method not implemented")
+            raise ValueError(f"Method {method} is not implemented")
+
+        return path, cost
+       
 
     def __call__(self, *args, **kwds) -> StandardProblem:
         return self.solve(*args, **kwds)
+
+    
