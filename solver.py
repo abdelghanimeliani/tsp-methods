@@ -10,6 +10,8 @@ logging.basicConfig(level=logging.DEBUG)
 from numpy import array
 from time import perf_counter
 from utils import distance, step, get_initial_solutions, update
+from permutation import Permutation
+from random import sample as randomize
 
 
 
@@ -166,7 +168,7 @@ class Solver:
         return best, instance.trace_tours([best])[0]
 
     def _pfa_solve(self, instance: StandardProblem, n_initial, max_iter):
-        population = get_initial_solutions(n_initial, instance.dimension).sort(key=lambda s: instance.trace_tours([s])[0])
+        population = get_initial_solutions(n_initial, instance.dimension)#.sort(key=lambda s: instance.trace_tours([s])[0])
         path_finder = previous_path_finder = population[0]
 
         for k in tqdm(range(max_iter)):
@@ -177,9 +179,18 @@ class Solver:
             A = int(u2*exp(-k*2/max_iter))
 
             # get next path finder
-            next_finder = step(None, None, r[3]*2*distance(None, None))
+            next_finder = step(
+                step(
+                    path_finder, 
+                    (Permutation(*previous_path_finder).inverse()*Permutation(*path_finder)).to_image(), 
+                    r[3]*2*distance(previous_path_finder, path_finder)
+                ),
+                Permutation(*randomize(list(range(1, instance.dimension+1)), instance.dimension)).to_image(),
+                A
+            )
 
             # if better update
+            previous_path_finder = path_finder
             path_finder = max(path_finder, next_finder, key=lambda s: instance.trace_tours([s])[0])
 
             # get next population
@@ -190,17 +201,17 @@ class Solver:
                     continue
                 
                 # generate random term
-                epsilon = int((1 - k/max_iter) * u1 * distance(s, choice(population)))
+                epsilon = int((1 - k/max_iter) * u1 * distance(s, population[randint(0, len(population))]))
                 # update solution
-                next_pop.append(update(s, population, path_finder, alpha, beta, epsilon))
+                next_pop.append(update(s, population, path_finder, alpha, beta, epsilon, r))
 
             # check for new path finder
             next_finder = max(next_pop.copy()+[path_finder], key= lambda s: instance.trace_tours([s])[0])    
 
-            for i, sol, sol_new in enumerate(zip(population, next_pop)):
+            for i, (sol, sol_new) in enumerate(zip(population, next_pop)):
                 population[i] = max(sol, sol_new, key=lambda s: instance.trace_tours([s])[0])
 
-            return path_finder
+            return instance.trace_tours(path_finder)[0], path_finder
 
     def solve(self, instance:StandardProblem, method:str="simulated_annealing", benchmark:bool=False, *args, **kwargs):
         

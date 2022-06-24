@@ -1,7 +1,7 @@
 from functools import reduce
 import permutation as perm
 import sympy.combinatorics as sym
-from random import shuffle
+from random import choice, shuffle
 
 
 def distance(sigma1: list, sigma2: list) -> int:
@@ -26,18 +26,24 @@ def step(sigma1:list, sigma2:list, n_steps: int) -> list:
         [sym.Permutation(*cycle) for cycle in comp], 
         sym.Permutation(list(range(len(sigma1))))
     ).transpositions()
-    disp = sym.Permutation(list(range(len(sigma1))))
-    for i in range(min(n_steps, len(sigma1))):
-        disp *= sym.Permutation(*trans[i])
+    disp = sigma1
+    for i in range(min(n_steps, len(trans))):
+        print(f"{disp=}")
+        disp = sym.Permutation(*trans[i])(disp)
     
-    return disp(sigma1)
+    return disp
     
 
 def get_initial_solutions(n_solutions, size):
     x = [list(range(1, size+1)) for _ in range(n_solutions)]
     for s in x:
         shuffle(s)
+    # print(x)
     return x
 
-def update(*args):
-    pass
+def update(solution, population, path_finder, alpha, beta, epsilon, r):
+    updater = choice(population)
+    res = list(range(1, len(population)+1))
+    res = step(res, updater, alpha*r[1])
+    res = step(res, path_finder, beta*r[2])
+    return res
