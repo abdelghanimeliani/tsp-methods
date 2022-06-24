@@ -166,7 +166,7 @@ class Solver:
         return best, instance.trace_tours([best])[0]
 
     def _pfa_solve(self, instance: StandardProblem, n_initial, max_iter):
-        population = get_initial_solutions(n_initial).sort(key=lambda s: instance.trace_tours([s])[0])
+        population = get_initial_solutions(n_initial, instance.dimension).sort(key=lambda s: instance.trace_tours([s])[0])
         path_finder = previous_path_finder = population[0]
 
         for k in tqdm(range(max_iter)):
