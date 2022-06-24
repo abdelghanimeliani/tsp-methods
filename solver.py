@@ -1,15 +1,15 @@
-
-from ast import While
 from typing import Callable
+from tqdm import tqdm
 from tsplib95.models import StandardProblem
 from queue import LifoQueue as stack
-from numpy.random import random, shuffle, randint, sample
+from numpy.random import random, shuffle, randint, sample, choice
 from numpy import exp
 import logging
 from tsplib95 import load
 logging.basicConfig(level=logging.DEBUG)
 from numpy import array
 from time import perf_counter
+from utils import distance, step, get_initial_solutions, update
 
 
 
@@ -165,7 +165,42 @@ class Solver:
             best = swapped
         return best, instance.trace_tours([best])[0]
 
+    def _pfa_solve(self, instance: StandardProblem, n_initial, max_iter):
+        population = get_initial_solutions(n_initial).sort(key=lambda s: instance.trace_tours([s])[0])
+        path_finder = previous_path_finder = population[0]
 
+        for k in tqdm(range(max_iter)):
+            # init random coefficients
+            alpha, beta = randint(1, 3, 2)
+            r = randint(0, 2, 4)
+            u1, u2 = randint(-1, 2, 2)
+            A = int(u2*exp(-k*2/max_iter))
+
+            # get next path finder
+            next_finder = step(None, None, r[3]*2*distance(None, None))
+
+            # if better update
+            path_finder = max(path_finder, next_finder, key=lambda s: instance.trace_tours([s])[0])
+
+            # get next population
+            next_pop = []
+            for s in population:
+                # don't touch path finder
+                if s == path_finder:
+                    continue
+                
+                # generate random term
+                epsilon = int((1 - k/max_iter) * u1 * distance(s, choice(population)))
+                # update solution
+                next_pop.append(update(s, population, path_finder, alpha, beta, epsilon))
+
+            # check for new path finder
+            next_finder = max(next_pop.copy()+[path_finder], key= lambda s: instance.trace_tours([s])[0])    
+
+            for i, sol, sol_new in enumerate(zip(population, next_pop)):
+                population[i] = max(sol, sol_new, key=lambda s: instance.trace_tours([s])[0])
+
+            return path_finder
 
     def solve(self, instance:StandardProblem, method:str="simulated_annealing", benchmark:bool=False, *args, **kwargs):
         
@@ -179,8 +214,11 @@ class Solver:
             path, cost = self._simulated_annealing_solve(instance, *args, **kwargs)
         elif method == "genetic_algorithm":
             path, cost = self._genetic_algorithm_solve(instance, *args, **kwargs)
+        elif method == "PFA":
+            path, cost = self._pfa_solve(instance, *args, **kwargs)
         else:
             raise ValueError(f"Method {method} is not implemented")
+        
 
         return path, cost
        
