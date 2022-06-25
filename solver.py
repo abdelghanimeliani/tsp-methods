@@ -259,6 +259,8 @@ class Solver:
                 unvisited.remove(neighbor)
             if instance.trace_tours([visited])[0] < best_cost:
                 initial = visited
+        if random() < .1:
+            self._pfa_solve(instance, 10, 10)
         return self._simulated_annealing_solve(instance, initial)
         
         

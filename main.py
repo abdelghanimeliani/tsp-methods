@@ -8,7 +8,7 @@ def main():
     solver = Solver()
     instance = load('benchmarks/ulysses22.tsp')
     solution = load('benchmarks/ulysses22.opt.tour')
-    path, cost = solver(instance, method='PFA', n_initial=1000, max_iter=10000)
+    path, cost = solver(instance, method='PFA', n_initial=1000, max_iter=10)
     opt_path = solution.as_keyword_dict()["TOUR_SECTION"][0]
     opt_cost = instance.trace_tours([opt_path])[0]
     print(f"{path=}\n{cost=}")
