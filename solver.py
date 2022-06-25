@@ -74,7 +74,7 @@ class Solver:
             for i, (sol, sol_new) in enumerate(zip(population, next_pop)):
                 population[i] = max(sol, sol_new, key=lambda s: instance.trace_tours([s])[0])
 
-            return instance.trace_tours(path_finder)[0], path_finder
+            return self._simulated_annealing_solve(instance, path_finder)
 
     def _get_adjacency_matrix(self, instance:StandardProblem) -> array:
         nodes = list(instance.get_nodes())
