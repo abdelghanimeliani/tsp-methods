@@ -31,7 +31,7 @@ class Solver:
                 - instance.get_weight(path[nodes_to_swap[1]], path[(nodes_to_swap[1] + 1) % mod])        
 
     def _pfa_solve(self, instance: StandardProblem, n_initial, max_iter):
-        population = get_initial_solutions(n_initial, instance.dimension)#.sort(key=lambda s: instance.trace_tours([s])[0])
+        population = get_initial_solutions(n_initial, instance.dimension).sort(key=lambda s: instance.trace_tours([s])[0])
         path_finder = previous_path_finder = population[0]
 
         for k in tqdm(range(max_iter)):
@@ -74,7 +74,7 @@ class Solver:
             for i, (sol, sol_new) in enumerate(zip(population, next_pop)):
                 population[i] = max(sol, sol_new, key=lambda s: instance.trace_tours([s])[0])
 
-            return self._simulated_annealing_solve(instance, path_finder)
+        return self._simulated_annealing_solve(instance, path_finder)
 
     def _get_adjacency_matrix(self, instance:StandardProblem) -> array:
         nodes = list(instance.get_nodes())
@@ -239,6 +239,8 @@ class Solver:
 
     def __call__(self, *args, **kwds) -> StandardProblem:
         return self.solve(*args, **kwds)
+    
+
 
     def _pfа_solve(self, instance:StandardProblem, *args, **kwargs):
         max_iters = kwargs["max_iter"]
