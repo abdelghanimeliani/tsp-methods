@@ -75,7 +75,6 @@ class Solver:
 
     def _nearest_neighbor_solve(self, instance:StandardProblem):
         unvisited = [node for node in instance.get_nodes() if node != 1]
-        print("unvisited")
         visited = [1]
         while unvisited:
             last = visited[-1]
@@ -92,6 +91,7 @@ class Solver:
     def _simulated_annealing_solve(
         self, 
         instance:StandardProblem, 
+        initial_tour:list=None,
         initial_temperature:float=100, 
         final_temperature:float=1,
         cooling_rate:float=.5
@@ -108,8 +108,11 @@ class Solver:
 
         # initialization
         temperature = initial_temperature
-        path = list(instance.get_nodes())
-        shuffle(path)
+        if initial_tour is None:
+            path = list(instance.get_nodes())
+            shuffle(path)
+        else:
+            path = initial_tour
         cost = instance.trace_tours([path])
 
         # Simulated annealing
@@ -226,7 +229,7 @@ class Solver:
         elif method == "genetic_algorithm":
             path, cost = self._genetic_algorithm_solve(instance, *args, **kwargs)
         elif method == "PFA":
-            path, cost = self._pfa_solve(instance, *args, **kwargs)
+            path, cost = self._pfа_solve(instance, *args, **kwargs)
         else:
             raise ValueError(f"Method {method} is not implemented")
         
@@ -237,4 +240,26 @@ class Solver:
     def __call__(self, *args, **kwds) -> StandardProblem:
         return self.solve(*args, **kwds)
 
+    def _pfа_solve(self, instance:StandardProblem, *args, **kwargs):
+        max_iters = kwargs["max_iter"]
+        best_cost = float('inf')
+        for _ in tqdm(range(max_iters)):
+            unvisited = [node for node in instance.get_nodes() if node != 1]
+            visited = [1]
+            while unvisited:
+                last = visited[-1]
+                neighbors = list(instance.get_nodes())
+                neighbors.sort(key=lambda x: instance.get_weight(last, x), reverse=True)
+                for neighbor in neighbors:
+                    if neighbor not in visited:
+                        break
+                else:
+                    raise ValueError('No solution found')
+                visited.append(neighbor)
+                unvisited.remove(neighbor)
+            if instance.trace_tours([visited])[0] < best_cost:
+                initial = visited
+        return self._simulated_annealing_solve(instance, initial)
+        
+        
     
